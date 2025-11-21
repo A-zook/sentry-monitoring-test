@@ -30,7 +30,7 @@ jobs:
       run: |
         echo "🚀 Creating Sentry release for production deployment..."
         sentry-cli releases new ${{ github.sha }}
-        sentry-cli releases set-commits ${{ github.sha }} --auto
+        sentry-cli releases set-commits ${{ github.sha }} --auto --ignore-missing
         echo "✅ Release ${{ github.sha }} created"
       env:
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
