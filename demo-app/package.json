@@ -1,0 +1,17 @@
+{
+  "name": "sentry-demo-app",
+  "version": "1.0.0",
+  "description": "Demo app for testing Sentry monitoring",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "echo 'Build complete'"
+  },
+  "dependencies": {
+    "@sentry/node": "^7.81.1"
+  },
+  "devDependencies": {},
+  "keywords": ["sentry", "monitoring", "demo"],
+  "author": "DevOps Engineer",
+  "license": "MIT"
+}

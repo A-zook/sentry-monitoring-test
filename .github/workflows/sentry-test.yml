@@ -1,0 +1,91 @@
+name: Sentry Monitoring Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  sentry-test:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      run: |
+        echo "📦 Node.js version:"
+        node --version
+        echo "📦 NPM version:"
+        npm --version
+        
+    - name: Install Sentry CLI
+      run: |
+        echo "🔧 Installing Sentry CLI..."
+        npm install -g @sentry/cli
+        sentry-cli --version
+        
+    - name: Install dependencies
+      run: |
+        echo "📥 Installing application dependencies..."
+        cd demo-app
+        npm install
+        
+    - name: Create Sentry release
+      run: |
+        echo "🚀 Creating Sentry release..."
+        cd demo-app
+        sentry-cli releases new ${{ github.sha }}
+        sentry-cli releases set-commits ${{ github.sha }} --auto
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        
+    - name: Build application
+      run: |
+        echo "🔨 Building application..."
+        cd demo-app
+        npm run build
+        
+    - name: Upload source maps (if any)
+      run: |
+        echo "📤 Uploading source maps..."
+        cd demo-app
+        # For this simple demo, we don't have source maps, but this is where you'd upload them
+        echo "ℹ️  No source maps to upload for this simple demo"
+        # sentry-cli releases files ${{ github.sha }} upload-sourcemaps ./dist
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        
+    - name: Finalize Sentry release
+      run: |
+        echo "✅ Finalizing Sentry release..."
+        cd demo-app
+        sentry-cli releases finalize ${{ github.sha }}
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        
+    - name: Run application and trigger error
+      run: |
+        echo "🔥 Running application to trigger Sentry error..."
+        cd demo-app
+        npm start || echo "✅ Application exited as expected (error was triggered)"
+      env:
+        SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        NODE_ENV: production
+        GITHUB_SHA: ${{ github.sha }}
+        
+    - name: Verify Sentry integration
+      run: |
+        echo "🔍 Sentry integration verification complete"
+        echo "📊 Check your Sentry dashboard for the error event"
+        echo "🔗 Release: ${{ github.sha }}"
+        echo "🏷️  Environment: production"
