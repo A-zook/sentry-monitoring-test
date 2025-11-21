@@ -1,0 +1,18 @@
+{
+  "name": "sentry-production-monitor",
+  "version": "1.0.0",
+  "description": "Production app with continuous Sentry monitoring",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "NODE_ENV=development node index.js",
+    "prod": "NODE_ENV=production node index.js"
+  },
+  "dependencies": {
+    "@sentry/node": "^7.81.1",
+    "express": "^4.18.2"
+  },
+  "keywords": ["sentry", "monitoring", "production"],
+  "author": "DevOps Engineer",
+  "license": "MIT"
+}

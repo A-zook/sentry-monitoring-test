@@ -1,0 +1,133 @@
+name: Deploy Production App with Sentry
+
+on:
+  push:
+    branches: [ main, production ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      run: |
+        echo "📦 Node.js version:"
+        node --version
+        echo "📦 NPM version:"
+        npm --version
+        
+    - name: Install Sentry CLI
+      run: |
+        echo "🔧 Ensuring Sentry CLI is available..."
+        sudo npm install -g @sentry/cli
+        sentry-cli --version
+        
+    - name: Create Sentry Release
+      run: |
+        echo "🚀 Creating Sentry release for production deployment..."
+        sentry-cli releases new ${{ github.sha }}
+        sentry-cli releases set-commits ${{ github.sha }} --auto
+        echo "✅ Release ${{ github.sha }} created"
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        
+    - name: Deploy to Production Directory
+      run: |
+        echo "📁 Deploying to production directory..."
+        
+        # Create production directory if it doesn't exist
+        sudo mkdir -p /var/www/production-app
+        sudo chown ubuntu:ubuntu /var/www/production-app
+        
+        # Copy production app files
+        cp -r production-app/* /var/www/production-app/
+        
+        # Set up environment variables
+        cd /var/www/production-app
+        echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" > .env
+        echo "NODE_ENV=production" >> .env
+        echo "PORT=3000" >> .env
+        echo "RELEASE_VERSION=${{ github.sha }}" >> .env
+        
+        echo "✅ Files deployed to /var/www/production-app"
+        
+    - name: Install Production Dependencies
+      run: |
+        echo "📥 Installing production dependencies..."
+        cd /var/www/production-app
+        npm install --production
+        echo "✅ Dependencies installed"
+        
+    - name: Setup PM2 and Start/Restart App
+      run: |
+        echo "🔄 Setting up PM2 process..."
+        cd /var/www/production-app
+        
+        # Export environment variables for PM2
+        export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+        export RELEASE_VERSION="${{ github.sha }}"
+        
+        # Check if app is already running
+        if pm2 describe sentry-production-monitor > /dev/null 2>&1; then
+          echo "🔄 Restarting existing PM2 process..."
+          pm2 restart sentry-production-monitor --update-env
+        else
+          echo "🚀 Starting new PM2 process..."
+          pm2 start ecosystem.config.js --env production
+        fi
+        
+        # Save PM2 configuration
+        pm2 save
+        
+        # Setup PM2 startup (only needs to be done once)
+        sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
+        
+        echo "✅ PM2 process configured and running"
+        
+    - name: Verify Deployment
+      run: |
+        echo "🔍 Verifying deployment..."
+        
+        # Wait for app to start
+        sleep 5
+        
+        # Check PM2 status
+        pm2 status
+        
+        # Check if app is responding
+        if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+          echo "✅ App is responding on port 3000"
+          curl -s http://localhost:3000/health | head -5
+        else
+          echo "❌ App is not responding on port 3000"
+          pm2 logs sentry-production-monitor --lines 10
+        fi
+        
+    - name: Finalize Sentry Release
+      run: |
+        echo "✅ Finalizing Sentry release..."
+        sentry-cli releases finalize ${{ github.sha }}
+        
+        # Associate release with deployment
+        sentry-cli releases deploys ${{ github.sha }} new -e production
+        
+        echo "🎉 Deployment complete! Release ${{ github.sha }} is live"
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        
+    - name: Show Monitoring Info
+      run: |
+        echo "📊 Production Monitoring Information:"
+        echo "🔗 Health Check: http://18.133.194.49:3000/health"
+        echo "🔥 Test Error: http://18.133.194.49:3000/test-error"
+        echo "📋 PM2 Status: pm2 status"
+        echo "📋 PM2 Logs: pm2 logs sentry-production-monitor"
+        echo "📋 Sentry Dashboard: Check for release ${{ github.sha }}"
