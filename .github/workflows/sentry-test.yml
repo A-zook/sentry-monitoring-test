@@ -25,7 +25,7 @@ jobs:
     - name: Install Sentry CLI
       run: |
         echo "🔧 Installing Sentry CLI..."
-        npm install -g @sentry/cli
+        sudo npm install -g @sentry/cli
         sentry-cli --version
         
     - name: Install dependencies
